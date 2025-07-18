@@ -48,7 +48,7 @@ const PitStrategyApp = () => {
   // Utility Functions
   const getElapsedTime = (startTime) => {
     if (!startTime) return 0;
-    const rawElapsed = (currentTime - startTime) / 60000; // minutes with decimals for seconds
+    const rawElapsed = (currentTime.getTime() - startTime.getTime()) / 60000; // minutes with decimals for seconds
     
     // Cap elapsed time at the current stint's planned length to prevent exceeding fuel range
     const currentTeamState = teamStates[selectedTeam];
@@ -976,7 +976,7 @@ const PitStrategyApp = () => {
 
   const openStintTimeModal = (stintIndex, field, type) => {
     const stint = currentTeam.stints[stintIndex];
-    let currentValue = '';
+    let currentValue: Date | null = null;
     
     if (field === 'start') {
       currentValue = type === 'planned' ? stint.plannedStart : stint.actualStart;
@@ -984,8 +984,7 @@ const PitStrategyApp = () => {
       currentValue = type === 'planned' ? stint.plannedFinish : stint.actualFinish;
     }
     
-    if (currentValue) {
-      // Format as HH:MM:SS for the input
+    if (currentValue instanceof Date){
       setTempTimeValue(currentValue.toLocaleTimeString('en-US', { hour12: false }));
     } else {
       setTempTimeValue('');
@@ -1480,8 +1479,7 @@ const PitStrategyApp = () => {
                     </span>
                   </div>
                   {canPitOnFCY(selectedTeam) && (
-                    <button
-                      onClick={executePit}
+                    <button onClick={() => executePit()}
                       className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-green-500/25"
                     >
                       PIT NOW
