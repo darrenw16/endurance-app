@@ -166,6 +166,7 @@ const PitStrategyApp = () => {
     
     if (!team || !team.drivers.length) {
       console.log(`No team or no drivers found`);
+      console.log('Test');
       return '--';
     }
     
