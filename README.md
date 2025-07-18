@@ -53,7 +53,7 @@ Try the app: [Live Demo](https://your-deployment-url.vercel.app) *(Coming soon)*
 ## 🛠️ **Installation & Setup**
 
 ### Prerequisites
-- **Node.js** 18+ 
+- **Node.js** 18+
 - **npm** or **yarn**
 
 ### Quick Start
@@ -224,7 +224,7 @@ We welcome contributions! Here's how to get started:
 
 ## 🐛 **Bug Reports & Feature Requests**
 
-Found a bug or have a feature idea? 
+Found a bug or have a feature idea?
 
 - **Bug Reports**: [Create an issue](https://github.com/your-username/endurance-app/issues/new?template=bug_report.md)
 - **Feature Requests**: [Request a feature](https://github.com/your-username/endurance-app/issues/new?template=feature_request.md)
@@ -237,24 +237,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Material Design 3** - Design system inspiration
 - **React Testing Library** - Testing best practices  
-- **Endurance Racing Community** - Domain expertise and feedback
 - **Open Source Contributors** - Various utility libraries
-
-## 📊 **Roadmap**
-
-### 🔜 **Coming Soon**
-- [ ] Real-time data export (CSV/JSON)
-- [ ] Multi-race session management
-- [ ] Weather integration
-- [ ] Tire strategy planning
-- [ ] Team communication features
-
-### 🎯 **Future Enhancements**
-- [ ] Real-time data feeds integration
-- [ ] Advanced analytics and reporting
-- [ ] Mobile app version
-- [ ] Multi-language support
-- [ ] Cloud save/sync functionality
 
 ---
 
