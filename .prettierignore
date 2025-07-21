@@ -1,0 +1,19 @@
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+build
+
+# Generated files
+coverage
+*.min.js
+*.min.css
+
+# Config files that should keep their format
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Markdown files (optional - remove if you want prettier to format them)
+*.md

@@ -22,7 +22,7 @@
   "license": "MIT",
   "author": {
     "name": "Darren Walsh",
-    "email": "darren@example.com"
+    "email": "your-email@example.com"
   },
   "type": "module",
   "scripts": {
