@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, type ReactNode } from 'react';
 import { 
   useRaceState, 
   useTeamState, 
@@ -15,7 +15,7 @@ import {
   formatRaceTime,
   getRemainingRaceTime
 } from '../utils/timeFormatting';
-import type { RaceConfig, TeamState, EditingStint } from '../types';
+import type { RaceConfig, TeamState, EditingStint, DraggedDriver } from '../types';
 
 // Define the shape of the race context
 interface RaceContextType {
@@ -56,8 +56,8 @@ interface RaceContextType {
   modals: {
     // Pit Dialog
     showPitDialog: boolean;
-    pitReason: string;
-    setPitReason: (reason: string) => void;
+    pitReason: 'scheduled' | 'fcyOpportunity' | 'unscheduled';
+    setPitReason: React.Dispatch<React.SetStateAction<'scheduled' | 'fcyOpportunity' | 'unscheduled'>>;
     fuelTaken: boolean;
     setFuelTaken: (taken: boolean) => void;
     driverChanged: boolean;
@@ -95,12 +95,13 @@ interface RaceContextType {
   
   // Drag and Drop State
   dragAndDrop: {
+    draggedDriver: DraggedDriver | null;
     dragOverIndex: number | null;
     handleDriverDragStart: (e: React.DragEvent, stintIndex: number, teamIndex: number) => void;
     handleDriverDragOver: (e: React.DragEvent) => void;
     handleDriverDragEnter: (e: React.DragEvent, targetStintIndex: number) => void;
     handleDriverDragLeave: (e: React.DragEvent) => void;
-    handleDriverDrop: (e: React.DragEvent, targetStintIndex: number, targetTeamIndex: number) => void;
+    handleDriverDrop: (e: React.DragEvent, targetStintIndex: number, selectedTeam: number, teamStates: any[]) => void;
   };
   
   // Pit Stop
@@ -398,7 +399,7 @@ export const RaceProvider: React.FC<RaceProviderProps> = ({
         ? (modals.editingStint.field === 'start' ? 'plannedStart' : 'plannedFinish')
         : (modals.editingStint.field === 'start' ? 'actualStart' : 'actualFinish');
       
-      stint[fieldName as keyof typeof stint] = newTime;
+      (stint as any)[fieldName] = newTime;
       
       updatedStints[modals.editingStint.index!] = stint;
       

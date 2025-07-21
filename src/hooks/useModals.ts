@@ -110,6 +110,7 @@ export const useModals = () => {
     // Setters
     setTempTimeValue,
     setTempFuelRangeValue,
+    setEditingStint,
     setPitReason,
     setFuelTaken,
     setDriverChanged,

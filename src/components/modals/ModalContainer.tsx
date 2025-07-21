@@ -8,8 +8,8 @@ import type { RaceConfig } from '../../types';
 interface ModalContainerProps {
   // Pit Stop Modal
   showPitDialog: boolean;
-  pitReason: string;
-  setPitReason: (reason: string) => void;
+  pitReason: 'scheduled' | 'fcyOpportunity' | 'unscheduled';
+  setPitReason: React.Dispatch<React.SetStateAction<'scheduled' | 'fcyOpportunity' | 'unscheduled'>>;
   fuelTaken: boolean;
   setFuelTaken: (taken: boolean) => void;
   driverChanged: boolean;

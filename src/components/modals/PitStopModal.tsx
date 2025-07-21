@@ -6,8 +6,8 @@ interface PitStopModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  pitReason: string;
-  setPitReason: (reason: string) => void;
+  pitReason: 'scheduled' | 'fcyOpportunity' | 'unscheduled';
+  setPitReason: React.Dispatch<React.SetStateAction<'scheduled' | 'fcyOpportunity' | 'unscheduled'>>;
   fuelTaken: boolean;
   setFuelTaken: (taken: boolean) => void;
   driverChanged: boolean;
@@ -40,7 +40,7 @@ const PitStopModal: React.FC<PitStopModalProps> = ({
           <label className="block text-sm font-medium text-gray-300 mb-3">Reason for Pit Stop</label>
           <select
             value={pitReason}
-            onChange={(e) => setPitReason(e.target.value)}
+            onChange={(e) => setPitReason(e.target.value as 'scheduled' | 'fcyOpportunity' | 'unscheduled')}
             className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           >
             <option value="scheduled">Scheduled Stop</option>
