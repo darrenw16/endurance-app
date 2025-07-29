@@ -6,12 +6,14 @@ interface RaceConfigurationProps {
   raceConfig: RaceConfig;
   setRaceConfig: React.Dispatch<React.SetStateAction<RaceConfig>>;
   onStartRace: () => void;
+  onFuelRangeChange?: () => void;
 }
 
 const RaceConfiguration: React.FC<RaceConfigurationProps> = ({
   raceConfig,
   setRaceConfig,
   onStartRace,
+  onFuelRangeChange,
 }) => {
   const addTeam = () => {
     setRaceConfig(prev => ({
@@ -129,7 +131,14 @@ const RaceConfiguration: React.FC<RaceConfigurationProps> = ({
                 id="fuel-range"
                 type="number"
                 value={raceConfig.fuelRangeMinutes}
-                onChange={(e) => setRaceConfig(prev => ({ ...prev, fuelRangeMinutes: parseInt(e.target.value) || 108 }))}
+                onChange={(e) => {
+                  const newValue = parseInt(e.target.value) || 108;
+                  setRaceConfig(prev => ({ ...prev, fuelRangeMinutes: newValue }));
+                  // Trigger recalculation if callback provided
+                  if (onFuelRangeChange) {
+                    setTimeout(onFuelRangeChange, 0);
+                  }
+                }}
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 min="30"
                 max="180"
@@ -171,7 +180,7 @@ const RaceConfiguration: React.FC<RaceConfigurationProps> = ({
               {raceConfig.teams.map((team, teamIndex) => (
                 <div key={teamIndex} className="border border-gray-600 rounded-xl p-6 bg-gray-750">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-semibold text-white">Team {teamIndex + 1}</h3>
+                    <h2 className="text-xl font-semibold text-white">Team {teamIndex + 1}</h2>
                     {raceConfig.teams.length > 1 && (
                       <button
                         onClick={() => deleteTeam(teamIndex)}

@@ -97,8 +97,9 @@ const CurrentStintStatus: React.FC<CurrentStintStatusProps> = ({
               }
               
               const elapsed = getElapsedTime(currentTeam.stintStartTime, currentTime);
-              const maxStintLength = raceConfig.fuelRangeMinutes;
-              const fcyWindowOpensAt = maxStintLength - 20;
+              // Use current stint's planned length instead of global fuel range
+              const currentStintLength = currentStint?.plannedLength || raceConfig.fuelRangeMinutes;
+              const fcyWindowOpensAt = currentStintLength - 20;
               
               if (elapsed >= fcyWindowOpensAt) {
                 return 'PIT WINDOW OPEN';

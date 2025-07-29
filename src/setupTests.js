@@ -1,29 +1,18 @@
-// src/setupTests.js
+// Basic test setup
 import '@testing-library/jest-dom';
 
-// Mock window.alert for tests (using vi instead of jest for better compatibility)
+// Mock common browser APIs - use simple functions instead of jest.fn()
 Object.defineProperty(window, 'alert', {
   value: () => {},
   writable: true,
 });
 
-// Mock window.confirm for tests  
 Object.defineProperty(window, 'confirm', {
   value: () => true,
   writable: true,
 });
 
-// Mock console methods to avoid noise in tests
-const originalConsole = { ...console };
-global.console = {
-  ...console,
-  // Uncomment to silence console.log in tests
-  // log: () => {},
-  warn: () => {},
-  error: () => {},
-};
-
-// Mock IntersectionObserver if needed
+// Mock observers
 global.IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
@@ -31,12 +20,9 @@ global.IntersectionObserver = class IntersectionObserver {
   unobserve() {}
 };
 
-// Mock ResizeObserver if needed
 global.ResizeObserver = class ResizeObserver {
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
 };
-
-// Note: Timer setup is moved to individual tests since jest globals aren't available here

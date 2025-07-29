@@ -13,3 +13,11 @@ export * from './modals';
 
 // Common Components
 export { default as RaceApp } from './common/RaceApp';
+export { ConfirmationDialog, useConfirmationDialog } from './common/ConfirmationDialog';
+export { DataPersistenceSettings } from './common/DataPersistenceSettings';
+
+// Error Boundaries
+export * from './errorBoundaries';
+
+// Optimized Components
+export * from './optimized';

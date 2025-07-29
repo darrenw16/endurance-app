@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { RaceConfig, TeamState } from '../types';
-import { generateStintPlan, recalculateStintPlan } from '../utils/stintPlanGenerator';
+import { generateStintPlan, recalculateStintPlan, recalculateStintPlanForFuelChange } from '../utils/stintPlanGenerator';
 
 /**
  * Custom hook for managing team states and operations

@@ -1,11 +1,11 @@
 import React, { createContext, useContext, type ReactNode } from 'react';
-import { 
-  useRaceState, 
-  useTeamState, 
-  useModals, 
-  useDragAndDrop, 
-  usePitStop 
-} from '../hooks';
+import {
+  CompositeRaceProvider,
+  useRaceTiming,
+  useTeamManagement,
+  usePitStopContext,
+  useUIState
+} from './split';
 import {
   formatDurationToHMS,
   parseTimeToMinutes,
@@ -17,13 +17,17 @@ import {
 } from '../utils/timeFormatting';
 import type { RaceConfig, TeamState, EditingStint, DraggedDriver } from '../types';
 
-// Define the shape of the race context
+/**
+ * Modern RaceContext built on split context architecture
+ * Provides the same API as the original for backward compatibility
+ * but uses the optimized split contexts internally
+ */
 interface RaceContextType {
   // Race Configuration
   raceConfig: RaceConfig;
   setRaceConfig: React.Dispatch<React.SetStateAction<RaceConfig>>;
   
-  // Race State
+  // Race State (from RaceTimingContext)
   raceState: {
     raceStarted: boolean;
     racePaused: boolean;
@@ -38,7 +42,7 @@ interface RaceContextType {
     updateRaceStartTime: (newStartTime: Date) => void;
   };
   
-  // Team State
+  // Team State (from TeamManagementContext)
   teamState: {
     teamStates: TeamState[];
     selectedTeam: number;
@@ -52,9 +56,8 @@ interface RaceContextType {
     recalculateTeamStintPlan: (teamIndex: number) => void;
   };
   
-  // Modals State
+  // Modals State (from UIStateContext)
   modals: {
-    // Pit Dialog
     showPitDialog: boolean;
     pitReason: 'scheduled' | 'fcyOpportunity' | 'unscheduled';
     setPitReason: React.Dispatch<React.SetStateAction<'scheduled' | 'fcyOpportunity' | 'unscheduled'>>;
@@ -65,25 +68,17 @@ interface RaceContextType {
     selectedDriverIndex: number;
     setSelectedDriverIndex: (index: number) => void;
     setShowPitDialog: (show: boolean) => void;
-    
-    // Time Edit Modals
     showElapsedModal: boolean;
     showRemainingModal: boolean;
     showRaceTimeModal: boolean;
     tempTimeValue: string;
     setTempTimeValue: (value: string) => void;
-    
-    // Fuel Range Modal
     showFuelRangeModal: boolean;
     tempFuelRangeValue: string;
     setTempFuelRangeValue: (value: string) => void;
-    
-    // Stint Time Modal
     showStintTimeModal: boolean;
     editingStint: EditingStint;
     setEditingStint: (stint: EditingStint) => void;
-    
-    // Modal Actions
     openPitDialog: (fcyActive: boolean, nextDriverIndex: number) => void;
     openElapsedModal: (currentValue: string) => void;
     openRemainingModal: (currentValue: string) => void;
@@ -93,7 +88,7 @@ interface RaceContextType {
     cancelModal: () => void;
   };
   
-  // Drag and Drop State
+  // Drag and Drop State (from TeamManagementContext)
   dragAndDrop: {
     draggedDriver: DraggedDriver | null;
     dragOverIndex: number | null;
@@ -104,7 +99,7 @@ interface RaceContextType {
     handleDriverDrop: (e: React.DragEvent, targetStintIndex: number, selectedTeam: number, teamStates: any[]) => void;
   };
   
-  // Pit Stop
+  // Pit Stop (from PitStopContext)
   pitStop: {
     executePitStop: (params: any) => void;
   };
@@ -117,8 +112,6 @@ interface RaceContextType {
     executePit: (teamIndex?: number) => void;
     confirmPitStop: () => void;
     toggleFCY: () => void;
-    
-    // Modal Actions
     openElapsedModal: () => void;
     openRemainingModal: () => void;
     openRaceTimeModal: () => void;
@@ -132,237 +125,217 @@ interface RaceContextType {
   };
 }
 
-// Create the context
 const RaceContext = createContext<RaceContextType | undefined>(undefined);
 
-// Provider component props
 interface RaceProviderProps {
   children: ReactNode;
   raceConfig: RaceConfig;
   setRaceConfig: React.Dispatch<React.SetStateAction<RaceConfig>>;
 }
 
-// Provider component
-export const RaceProvider: React.FC<RaceProviderProps> = ({ 
+/**
+ * Wrapper component that provides the unified RaceContext API
+ * using the optimized split contexts internally
+ */
+const RaceContextConsumer: React.FC<RaceProviderProps> = ({ 
   children, 
   raceConfig, 
   setRaceConfig 
 }) => {
-  // Initialize all hooks
-  const raceState = useRaceState(raceConfig);
-  const teamState = useTeamState(raceConfig, raceState.raceStartTime, raceState.currentTime);
-  const modals = useModals();
-  const dragAndDrop = useDragAndDrop(raceConfig, setRaceConfig);
-  const pitStop = usePitStop();
+  const raceTiming = useRaceTiming();
+  const teamManagement = useTeamManagement();
+  const pitStop = usePitStopContext();
+  const uiState = useUIState();
 
-  // Race Actions
+  // Race Actions using split contexts
   const startRace = () => {
-    const startTime = raceState.startRace();
-    teamState.initializeRaceStart(startTime);
+    const startTime = raceTiming.startRace();
+    teamManagement.initializeRaceStart(startTime);
   };
 
   const pauseRace = () => {
-    const result = raceState.pauseRace();
+    const result = raceTiming.pauseRace();
     if (result.resumed && result.pauseDuration > 0) {
-      teamState.handleRacePauseResume(result.pauseDuration);
+      teamManagement.handleRacePauseResume(result.pauseDuration);
     }
   };
 
   const stopRace = () => {
-    raceState.stopRace();
-    teamState.resetTeamStates();
+    raceTiming.stopRace();
+    teamManagement.resetTeamStates();
   };
 
-  const executePit = (teamIndex = teamState.selectedTeam) => {
-    // Validate team index
-    if (teamIndex < 0 || teamIndex >= teamState.teamStates.length) {
-      console.error(`Invalid team index: ${teamIndex}, teamStates length: ${teamState.teamStates.length}`);
+  const executePit = (teamIndex = teamManagement.selectedTeam) => {
+    if (teamIndex < 0 || teamIndex >= teamManagement.teamStates.length) {
+      console.error(`Invalid team index: ${teamIndex}`);
       return;
     }
     
-    // Validate team state exists
-    const currentTeamForPit = teamState.teamStates[teamIndex];
+    const currentTeamForPit = teamManagement.teamStates[teamIndex];
     if (!currentTeamForPit) {
       console.error(`No team state found for index: ${teamIndex}`);
       return;
     }
     
-    // Validate team config exists
     const teamConfig = raceConfig.teams[teamIndex];
     if (!teamConfig) {
       console.error(`No team config found for index: ${teamIndex}`);
       return;
     }
     
-    // Ensure we're working with the correct team
-    teamState.setSelectedTeam(teamIndex);
+    teamManagement.setSelectedTeam(teamIndex);
     
-    // Set the default next driver (next in rotation)
     const currentDriverIndex = currentTeamForPit.currentDriver || 0;
     const driversArray = teamConfig.drivers || [];
     const nextDriverIndex = driversArray.length > 0 
       ? (currentDriverIndex + 1) % driversArray.length 
       : 0;
     
-    modals.openPitDialog(raceState.fcyActive, nextDriverIndex);
+    uiState.actions.openPitDialog(raceTiming.fcyActive, nextDriverIndex);
   };
 
   const confirmPitStop = () => {
-    // Store FCY state before pit stop to avoid unintended changes
-    const fcyWasActive = raceState.fcyActive;
+    const fcyWasActive = raceTiming.fcyActive;
     
     pitStop.executePitStop({
-      selectedTeam: teamState.selectedTeam,
-      pitReason: modals.pitReason,
-      fuelTaken: modals.fuelTaken,
-      driverChanged: modals.driverChanged,
-      selectedDriverIndex: modals.selectedDriverIndex,
+      selectedTeam: teamManagement.selectedTeam,
+      pitReason: pitStop.pitReason,
+      fuelTaken: pitStop.fuelTaken,
+      driverChanged: pitStop.driverChanged,
+      selectedDriverIndex: pitStop.selectedDriverIndex,
       raceConfig,
-      teamStates: teamState.teamStates,
-      currentTime: raceState.currentTime,
-      setTeamStates: teamState.setTeamStates
+      teamStates: teamManagement.teamStates,
+      currentTime: raceTiming.currentTime,
+      setTeamStates: teamManagement.setTeamStates
     });
     
-    // Only recalculate stint plans for fuel-taking unscheduled stops
-    if (modals.fuelTaken && modals.pitReason === 'unscheduled') {
+    if (pitStop.fuelTaken && pitStop.pitReason === 'unscheduled') {
       setTimeout(() => {
-        teamState.recalculateTeamStintPlan(teamState.selectedTeam);
+        teamManagement.stintCalculations.recalculateTeamStintPlan(teamManagement.selectedTeam);
       }, 100);
     }
     
-    modals.setShowPitDialog(false);
+    uiState.setters.setShowPitDialog(false);
     
-    // Only turn off FCY if it was explicitly active before the pit stop
-    // Don't change FCY state if it wasn't active
     if (fcyWasActive) {
-      raceState.toggleFCY(); // Turn off FCY after pit stop during FCY period
+      raceTiming.fcyStrategy.toggleFCY();
     }
   };
-
-  const toggleFCY = raceState.toggleFCY;
 
   // Time modal functions
   const openElapsedModal = () => {
-    if (!teamState.teamStates[teamState.selectedTeam]?.stintStartTime) return;
-    const currentValue = getElapsedTime(teamState.teamStates[teamState.selectedTeam].stintStartTime!, raceState.currentTime);
-    modals.openElapsedModal(formatDurationToHMS(currentValue));
+    if (!teamManagement.teamStates[teamManagement.selectedTeam]?.stintStartTime) return;
+    const currentValue = getElapsedTime(teamManagement.teamStates[teamManagement.selectedTeam].stintStartTime!, raceTiming.currentTime);
+    uiState.actions.openElapsedModal(formatDurationToHMS(currentValue));
   };
 
   const openRemainingModal = () => {
-    if (!teamState.teamStates[teamState.selectedTeam]?.stintStartTime) return;
-    const currentTeam = teamState.teamStates[teamState.selectedTeam];
+    if (!teamManagement.teamStates[teamManagement.selectedTeam]?.stintStartTime) return;
+    const currentTeam = teamManagement.teamStates[teamManagement.selectedTeam];
     const currentStint = currentTeam.stints[currentTeam.currentStint - 1];
-    const currentValue = getRemainingTime(currentTeam.stintStartTime!, currentStint?.plannedLength || 0, raceState.currentTime);
-    modals.openRemainingModal(formatDurationToHMS(currentValue));
+    const currentValue = getRemainingTime(currentTeam.stintStartTime!, currentStint?.plannedLength || 0, raceTiming.currentTime);
+    uiState.actions.openRemainingModal(formatDurationToHMS(currentValue));
   };
 
   const openRaceTimeModal = () => {
-    modals.openRaceTimeModal(formatRaceTime(getRemainingRaceTime(raceState.raceStartTime, raceConfig.raceLengthHours, raceState.currentTime)));
+    uiState.actions.openRaceTimeModal(formatRaceTime(getRemainingRaceTime(raceTiming.raceStartTime, raceConfig.raceLengthHours, raceTiming.currentTime)));
   };
 
   const saveElapsedTime = () => {
-    if (!modals.tempTimeValue) {
-      modals.setShowElapsedModal(false);
-      modals.setTempTimeValue('');
+    if (!uiState.tempValues.tempTimeValue) {
+      uiState.setters.setShowElapsedModal(false);
+      uiState.setters.setTempTimeValue('');
       return;
     }
 
-    const totalMinutes = parseTimeToMinutes(modals.tempTimeValue);
-
-    // Adjust stint start time based on new elapsed time
-    const newStartTime = new Date(raceState.currentTime.getTime() - (totalMinutes * 60000));
-    teamState.updateTeamState(teamState.selectedTeam, (team) => ({
+    const totalMinutes = parseTimeToMinutes(uiState.tempValues.tempTimeValue);
+    const newStartTime = new Date(raceTiming.currentTime.getTime() - (totalMinutes * 60000));
+    teamManagement.updateTeamState(teamManagement.selectedTeam, (team) => ({
       ...team,
       stintStartTime: newStartTime
     }));
 
-    modals.setShowElapsedModal(false);
-    modals.setTempTimeValue('');
+    uiState.setters.setShowElapsedModal(false);
+    uiState.setters.setTempTimeValue('');
   };
 
   const saveRemainingTime = () => {
-    if (!modals.tempTimeValue) {
-      modals.setShowRemainingModal(false);
-      modals.setTempTimeValue('');
+    if (!uiState.tempValues.tempTimeValue) {
+      uiState.setters.setShowRemainingModal(false);
+      uiState.setters.setTempTimeValue('');
       return;
     }
 
-    const totalMinutes = parseTimeToMinutes(modals.tempTimeValue);
-    const currentTeam = teamState.teamStates[teamState.selectedTeam];
+    const totalMinutes = parseTimeToMinutes(uiState.tempValues.tempTimeValue);
+    const currentTeam = teamManagement.teamStates[teamManagement.selectedTeam];
     const currentStint = currentTeam.stints[currentTeam.currentStint - 1];
     
-    // Adjust stint start time based on new remaining time
     const currentStintLength = currentStint?.plannedLength || 0;
     const newElapsed = currentStintLength - totalMinutes;
-    const newStartTime = new Date(raceState.currentTime.getTime() - (newElapsed * 60000));
-    teamState.updateTeamState(teamState.selectedTeam, (team) => ({
+    const newStartTime = new Date(raceTiming.currentTime.getTime() - (newElapsed * 60000));
+    teamManagement.updateTeamState(teamManagement.selectedTeam, (team) => ({
       ...team,
       stintStartTime: newStartTime
     }));
 
-    modals.setShowRemainingModal(false);
-    modals.setTempTimeValue('');
+    uiState.setters.setShowRemainingModal(false);
+    uiState.setters.setTempTimeValue('');
   };
 
   const saveRaceTime = () => {
-    if (!modals.tempTimeValue) {
-      modals.setShowRaceTimeModal(false);
-      modals.setTempTimeValue('');
+    if (!uiState.tempValues.tempTimeValue) {
+      uiState.setters.setShowRaceTimeModal(false);
+      uiState.setters.setTempTimeValue('');
       return;
     }
 
-    const totalMinutes = parseTimeToMinutes(modals.tempTimeValue);
-
-    // Calculate what the race start time should be to result in this remaining time
+    const totalMinutes = parseTimeToMinutes(uiState.tempValues.tempTimeValue);
     const totalRaceMinutes = raceConfig.raceLengthHours * 60;
     const elapsedMinutes = totalRaceMinutes - totalMinutes;
-    const newStartTime = new Date(raceState.currentTime.getTime() - (elapsedMinutes * 60000));
+    const newStartTime = new Date(raceTiming.currentTime.getTime() - (elapsedMinutes * 60000));
     
-    raceState.updateRaceStartTime(newStartTime);
+    raceTiming.updateRaceStartTime(newStartTime);
     
-    // Also adjust all team stint start times by the same amount
-    if (raceState.raceStartTime) {
-      const timeDifference = newStartTime.getTime() - raceState.raceStartTime.getTime();
-      teamState.setTeamStates(prev => prev.map(team => ({
+    if (raceTiming.raceStartTime) {
+      const timeDifference = newStartTime.getTime() - raceTiming.raceStartTime.getTime();
+      teamManagement.setTeamStates(prev => prev.map(team => ({
         ...team,
         stintStartTime: team.stintStartTime ? new Date(team.stintStartTime.getTime() + timeDifference) : null,
         lastPitTime: team.lastPitTime ? new Date(team.lastPitTime.getTime() + timeDifference) : null
       })));
     }
 
-    modals.setShowRaceTimeModal(false);
-    modals.setTempTimeValue('');
+    uiState.setters.setShowRaceTimeModal(false);
+    uiState.setters.setTempTimeValue('');
   };
 
   const openFuelRangeModal = () => {
-    modals.openFuelRangeModal(raceConfig.fuelRangeMinutes.toString());
+    uiState.actions.openFuelRangeModal(raceConfig.fuelRangeMinutes.toString());
   };
 
   const saveFuelRange = () => {
-    const newFuelRange = parseInt(modals.tempFuelRangeValue);
+    const newFuelRange = parseInt(uiState.tempValues.tempFuelRangeValue);
     
     if (!newFuelRange || newFuelRange < 30 || newFuelRange > 300) {
       alert('Please enter a valid fuel range between 30 and 300 minutes');
       return;
     }
 
-    // Update the race configuration
     setRaceConfig(prev => ({
       ...prev,
       fuelRangeMinutes: newFuelRange
     }));
 
-    // Recalculate stint plans for all teams with the new fuel range
     setTimeout(() => {
-      teamState.recalculateAllStintPlans();
+      teamManagement.stintCalculations.recalculateAllStintPlans();
     }, 100);
 
-    modals.setShowFuelRangeModal(false);
-    modals.setTempFuelRangeValue('');
+    uiState.setters.setShowFuelRangeModal(false);
+    uiState.setters.setTempFuelRangeValue('');
   };
 
   const openStintTimeModal = (stintIndex: number, field: string, type: string) => {
-    const currentTeam = teamState.teamStates[teamState.selectedTeam];
+    const currentTeam = teamManagement.teamStates[teamManagement.selectedTeam];
     const stint = currentTeam.stints[stintIndex];
     let currentValue: Date | null = null;
     
@@ -373,38 +346,36 @@ export const RaceProvider: React.FC<RaceProviderProps> = ({
     }
     
     const timeValue = currentValue instanceof Date ? currentValue.toLocaleTimeString('en-US', { hour12: false }) : '';
-    modals.openStintTimeModal(stintIndex, field, type, timeValue);
+    uiState.actions.openStintTimeModal(stintIndex, field, type, timeValue);
   };
 
   const saveStintTime = () => {
-    if (!modals.tempTimeValue || modals.editingStint.index === null) {
-      modals.setShowStintTimeModal(false);
-      modals.setTempTimeValue('');
-      modals.setEditingStint({ index: null, field: null, type: null });
+    if (!uiState.tempValues.tempTimeValue || uiState.tempValues.editingStint.index === null) {
+      uiState.setters.setShowStintTimeModal(false);
+      uiState.setters.setTempTimeValue('');
+      uiState.setters.setEditingStint({ index: null, field: null, type: null });
       return;
     }
 
-    const newTime = createTimeForToday(modals.tempTimeValue);
+    const newTime = createTimeForToday(uiState.tempValues.tempTimeValue);
     if (!newTime) {
       alert('Please enter time in HH:MM:SS format');
       return;
     }
 
-    // Update the specific stint time
-    teamState.updateTeamState(teamState.selectedTeam, (team) => {
+    teamManagement.updateTeamState(teamManagement.selectedTeam, (team) => {
       const updatedStints = [...team.stints];
-      const stint = { ...updatedStints[modals.editingStint.index!] };
+      const stint = { ...updatedStints[uiState.tempValues.editingStint.index!] };
       
-      const fieldName = modals.editingStint.type === 'planned' 
-        ? (modals.editingStint.field === 'start' ? 'plannedStart' : 'plannedFinish')
-        : (modals.editingStint.field === 'start' ? 'actualStart' : 'actualFinish');
+      const fieldName = uiState.tempValues.editingStint.type === 'planned' 
+        ? (uiState.tempValues.editingStint.field === 'start' ? 'plannedStart' : 'plannedFinish')
+        : (uiState.tempValues.editingStint.field === 'start' ? 'actualStart' : 'actualFinish');
       
       (stint as any)[fieldName] = newTime;
       
-      updatedStints[modals.editingStint.index!] = stint;
+      updatedStints[uiState.tempValues.editingStint.index!] = stint;
       
-      // If we're editing the actual start time of the active stint, update the team's stint start time
-      if (modals.editingStint.field === 'start' && modals.editingStint.type === 'actual' && stint.status === 'active') {
+      if (uiState.tempValues.editingStint.field === 'start' && uiState.tempValues.editingStint.type === 'actual' && stint.status === 'active') {
         return {
           ...team,
           stintStartTime: newTime,
@@ -418,27 +389,81 @@ export const RaceProvider: React.FC<RaceProviderProps> = ({
       };
     });
 
-    modals.setShowStintTimeModal(false);
-    modals.setTempTimeValue('');
-    modals.setEditingStint({ index: null, field: null, type: null });
+    uiState.setters.setShowStintTimeModal(false);
+    uiState.setters.setTempTimeValue('');
+    uiState.setters.setEditingStint({ index: null, field: null, type: null });
   };
 
-  // Create the context value
+  // Create the unified context value
   const contextValue: RaceContextType = {
     raceConfig,
     setRaceConfig,
-    raceState,
-    teamState,
-    modals,
-    dragAndDrop,
-    pitStop,
+    raceState: {
+      raceStarted: raceTiming.raceStarted,
+      racePaused: raceTiming.racePaused,
+      raceStartTime: raceTiming.raceStartTime,
+      pausedTime: raceTiming.pausedTime,
+      currentTime: raceTiming.currentTime,
+      fcyActive: raceTiming.fcyActive,
+      startRace: raceTiming.startRace,
+      pauseRace: raceTiming.pauseRace,
+      stopRace: raceTiming.stopRace,
+      toggleFCY: raceTiming.fcyStrategy.toggleFCY,
+      updateRaceStartTime: raceTiming.updateRaceStartTime,
+    },
+    teamState: {
+      teamStates: teamManagement.teamStates,
+      selectedTeam: teamManagement.selectedTeam,
+      setSelectedTeam: teamManagement.setSelectedTeam,
+      setTeamStates: teamManagement.setTeamStates,
+      initializeRaceStart: teamManagement.initializeRaceStart,
+      resetTeamStates: teamManagement.resetTeamStates,
+      handleRacePauseResume: teamManagement.handleRacePauseResume,
+      updateTeamState: teamManagement.updateTeamState,
+      recalculateAllStintPlans: teamManagement.stintCalculations.recalculateAllStintPlans,
+      recalculateTeamStintPlan: teamManagement.stintCalculations.recalculateTeamStintPlan,
+    },
+    modals: {
+      showPitDialog: uiState.modals.showPitDialog,
+      pitReason: pitStop.pitReason,
+      setPitReason: pitStop.setPitReason,
+      fuelTaken: pitStop.fuelTaken,
+      setFuelTaken: pitStop.setFuelTaken,
+      driverChanged: pitStop.driverChanged,
+      setDriverChanged: pitStop.setDriverChanged,
+      selectedDriverIndex: pitStop.selectedDriverIndex,
+      setSelectedDriverIndex: pitStop.setSelectedDriverIndex,
+      setShowPitDialog: uiState.setters.setShowPitDialog,
+      showElapsedModal: uiState.modals.showElapsedModal,
+      showRemainingModal: uiState.modals.showRemainingModal,
+      showRaceTimeModal: uiState.modals.showRaceTimeModal,
+      tempTimeValue: uiState.tempValues.tempTimeValue,
+      setTempTimeValue: uiState.setters.setTempTimeValue,
+      showFuelRangeModal: uiState.modals.showFuelRangeModal,
+      tempFuelRangeValue: uiState.tempValues.tempFuelRangeValue,
+      setTempFuelRangeValue: uiState.setters.setTempFuelRangeValue,
+      showStintTimeModal: uiState.modals.showStintTimeModal,
+      editingStint: uiState.tempValues.editingStint,
+      setEditingStint: uiState.setters.setEditingStint,
+      openPitDialog: uiState.actions.openPitDialog,
+      openElapsedModal: uiState.actions.openElapsedModal,
+      openRemainingModal: uiState.actions.openRemainingModal,
+      openRaceTimeModal: uiState.actions.openRaceTimeModal,
+      openFuelRangeModal: uiState.actions.openFuelRangeModal,
+      openStintTimeModal: uiState.actions.openStintTimeModal,
+      cancelModal: uiState.actions.cancelModal,
+    },
+    dragAndDrop: teamManagement.dragAndDrop,
+    pitStop: {
+      executePitStop: pitStop.executePitStop
+    },
     actions: {
       startRace,
       pauseRace,
       stopRace,
       executePit,
       confirmPitStop,
-      toggleFCY,
+      toggleFCY: raceTiming.fcyStrategy.toggleFCY,
       openElapsedModal,
       openRemainingModal,
       openRaceTimeModal,
@@ -459,7 +484,19 @@ export const RaceProvider: React.FC<RaceProviderProps> = ({
   );
 };
 
-// Custom hook to use the race context
+/**
+ * Modern RaceProvider using optimized split contexts
+ */
+export const RaceProvider: React.FC<RaceProviderProps> = ({ children, raceConfig, setRaceConfig }) => {
+  return (
+    <CompositeRaceProvider raceConfig={raceConfig} setRaceConfig={setRaceConfig}>
+      <RaceContextConsumer raceConfig={raceConfig} setRaceConfig={setRaceConfig}>
+        {children}
+      </RaceContextConsumer>
+    </CompositeRaceProvider>
+  );
+};
+
 export const useRaceContext = () => {
   const context = useContext(RaceContext);
   if (context === undefined) {
@@ -468,5 +505,4 @@ export const useRaceContext = () => {
   return context;
 };
 
-// Export the context for advanced use cases
 export { RaceContext };

@@ -63,10 +63,13 @@ export const calculateFCYBuffer = (
   
   const elapsed = getElapsedTime(teamState.stintStartTime, currentTime);
   const remainingRaceMinutes = getRemainingRaceTime(raceStartTime, raceConfig.raceLengthHours, currentTime);
-  const maxStintLength = raceConfig.fuelRangeMinutes;
+  
+  // Get the current stint's planned length, fall back to fuel range if not available
+  const currentStint = teamState.stints?.[teamState.currentStint - 1];
+  const maxStintLength = currentStint?.plannedLength || raceConfig.fuelRangeMinutes;
   
   // FCY window opens 20 minutes before max stint length
-  const fcyWindowOpensAt = maxStintLength - 20; // e.g., 108 - 20 = 88 minutes
+  const fcyWindowOpensAt = maxStintLength - 20;
   
   // Simple check first - are we past the time threshold?
   if (elapsed >= fcyWindowOpensAt) {
