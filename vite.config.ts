@@ -4,9 +4,13 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: process.env.NODE_ENV === 'production' ? '/endurance-app/' : '/',
+  // Remove the base path for Netlify (use root)
+  base: '/',
   build: {
-    sourcemap: true
+    sourcemap: true,
+    outDir: 'dist',
+    // Ensure assets are properly handled
+    assetsDir: 'assets'
   },
   // PWA configuration for manual service worker
   define: {
